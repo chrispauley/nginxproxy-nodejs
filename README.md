@@ -1,4 +1,4 @@
-# docker-express
+# nginxproxy-nodejs
 
 This is a bare minimum nodejs server app that is wrapped in a Docker image.
 
@@ -7,9 +7,15 @@ Install Docker
 
 Node JS is not required on your development machine, that is part of this image.
 
-## Create the image
+## Create the nodejs image
 
 First create your site.
+```
+mkdir nginxproxy-nodejs
+cd nginxproxy-nodejs
+mkdir nodejs nginx
+cd nodejs
+```
 
 Here we will use index.js to server 'hello world' text message from our express server.
 ```
@@ -37,20 +43,46 @@ EXPOSE 3000
 CMD node index.js
 ```
 
-Create and run a container from the image. This will build a container with the tag "express-helloworld" and the dot indicates the Dockerfile location.
+Create and run a container from the image. This will build a container with the tag "chrispauley/node-app" and the dot indicates the Dockerfile location.
 ```
+cd nodejs
 docker build -t chrispauley/node-app .
 ```
 
-## View the image on your machine
+Next, switch to the nginx directory.
 ```
+cd ../nginx
+touch default.conf
+```
+
+Create the nginx server configuration file for the proxy.
+default.conf
+
+```
+server {
+  location / {
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_pass http://app:3000;
+  }
+}
+```
+
+Create the Dockerfile for nginx
+```
+FROM nginx
+COPY default.conf /etc/nginx/conf.d/
+```
+
+Then build and view the image on your machine
+```
+docker build -t chrispauley/nginx-proxy .
 docker images
 ```
 
 ## Run and test your image in a container
-The -ti for "terminal interactive" allows you to use ^C to kill the process.
-The -p 3000:3000 options indicate the exposedPort:internalPort accessiblility.
-The express-helloworld option indicates the image name to create a container.
 ```
 docker run -ti -p 3000:3000 --name node-app chrispauley/node-app
 docker run -d -p 8000:80 --link node-app:app --name nginx-proxy chrispauley/nginx-proxy
@@ -89,41 +121,21 @@ Add to your github repo
 git init
 git add .
 ## create your github repo
-git remote add origin https://github.com/chrispauley/docker-express.git
+git remote add origin https://github.com/chrispauley/nginxproxy-nodejs.git
 git push origin master
 ```
 
 ### Deploy to a Docker Host
 Login to your server host. At a terminal window
 ```
-git clone https://github.com/chrispauley/docker-express.git
-cd docker-express
+git clone https://github.com/chrispauley/nginxproxy-nodejs.git
+cd nginxproxy-nodejs
 docker build -t express-helloworld .
 docker run -ti -p 8000:8000 express-helloworld
 ```
 Make sure your server host port 8000 is accessible and test it:
- [http://192.168.0.84:8000/](http://192.168.0.84:8000/)
+ [http://localhost:8000/](http://localhost:8000/)
 Update a cname record on your domain and your up.
 
 ## Clean Up
 Remember to clean up your containers and images!
-
-
-### Deploy to Docker Hub
-First tag your image with your hub.docker.com user account name:
-```
-docker tag a234b052333a chrispauley/express-helloworld
-docker images
-```
-
-Next, login and push to Docker hub
-```
-docker push chrispauley/express-helloworld
-```
-
-Now you can deploy using a docker pull command on a docker host server.
-Switch to the docker host machine.
-```
-docker run -ti -p 8000:8000 chrispauley/express-helloworld
-```
-Test it from your browser and enjoy.
